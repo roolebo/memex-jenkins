@@ -41,10 +41,16 @@ EOF
 
 HOST_RE='^https?://[^/]+'
 
+# Escapes a string for a double-quoted value in a curl config
+quote() {
+  sed 's/[\\"]/\\&/g' <<< "$1"
+}
+
 # Prints the curl config lines that authenticate
 auth() {
   if [ -n "$JENKINS_USER" -a -n "$JENKINS_TOKEN" ]; then
-    printf 'user = "%s:%s"\n' "$JENKINS_USER" "$JENKINS_TOKEN"
+    printf 'user = "%s:%s"\n' "$(quote "$JENKINS_USER")" \
+      "$(quote "$JENKINS_TOKEN")"
   else
     echo netrc-optional
   fi
