@@ -50,4 +50,4 @@ Capabilities: `bugs` is false, the others true.
 - Pipeline stages as suites when there is no test report?
 
 [memex]: https://github.com/roolebo/memex
-[ci.md]: https://github.com/roolebo/memex/blob/main/ci.md
+[ci.md]: https://github.com/roolebo/memex/blob/main/skills/memex/ci.md
