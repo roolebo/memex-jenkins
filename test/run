@@ -408,6 +408,60 @@ test_logs_suite() {
   check requests "$(requests length)" 0
 }
 
+RETEST='_class,url,actions[parameters[name,value]]'
+
+# A configuration is built again by building its matrix job with the
+# build's parameters, the reason as the cause
+test_retest_matrix() {
+  login
+  echo '{"reason": "LU-930: flaky test"}' > "$IN"
+  route GET "${EL9}api/json?tree=$RETEST" retest-run.json
+  route POST "$ADDR/buildWithParameters" - 201
+  call retest "$EL9"
+  check status "$STATUS" 0
+  check output "$OUT" ''
+  check post "$(requests '.[1] | "\(.method) \(.url)"')" \
+    "POST $ADDR/buildWithParameters"
+  check body "$(requests '.[1].body | split("&") | .[]')" \
+    'GERRIT_CHANGE_NUMBER=69978
+GERRIT_REFSPEC=refs%2Fchanges%2F78%2F69978%2F2
+GERRIT_CHANGE_SUBJECT=LU-930%20doc%3A%20fix%20a%20%26%20b
+cause=LU-930%3A%20flaky%20test'
+  check auth "$(requests '.[1].auth')" stdin
+  check "body on the command line" \
+    "$(requests '.[1].args | map(select(contains("cause"))) | length')" 0
+}
+
+test_retest_freestyle() {
+  local run=https://ci.example.org/job/lustre-master/4567/
+  ADDR=https://ci.example.org
+  echo '{"reason": 12}' > "$IN"
+  route GET "${run}api/json?tree=$RETEST" retest-master.json
+  route POST "$ADDR/job/lustre-master/buildWithParameters" - 201
+  call retest "$run"
+  check status "$STATUS" 0
+  check body "$(requests '.[1].body')" cause=12
+}
+
+test_retest_no_reason() {
+  echo '{}' > "$IN"
+  call retest "$EL9"
+  check empty "$STATUS" 1
+  echo 'LU-930' > "$IN"
+  call retest "$EL9"
+  check "not JSON" "$STATUS" 1
+  check requests "$(requests length)" 0
+}
+
+test_retest_refused() {
+  echo '{"reason": "flaky"}' > "$IN"
+  route GET "${EL9}api/json?tree=$RETEST" retest-run.json
+  route POST "$ADDR/buildWithParameters" not-found.html 403
+  call retest "$EL9"
+  check status "$STATUS" 1
+  check_has error "$ERR" "Cannot retest $EL9"
+}
+
 run() {
   local failed=$FAILED
   TEST=$1

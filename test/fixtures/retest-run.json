@@ -1,0 +1,13 @@
+{
+  "_class": "hudson.matrix.MatrixRun",
+  "actions": [
+    {"_class": "hudson.model.CauseAction"},
+    {"_class": "hudson.model.ParametersAction", "parameters": [
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_CHANGE_NUMBER", "value": "69978"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_REFSPEC", "value": "refs/changes/78/69978/2"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_CHANGE_SUBJECT", "value": "LU-930 doc: fix a & b"},
+      {"_class": "hudson.model.FileParameterValue", "name": "PATCH", "value": null}
+    ]}
+  ],
+  "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"
+}
