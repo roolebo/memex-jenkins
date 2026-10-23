@@ -247,7 +247,7 @@ retest() {
   local job
   local body
   input=$(cat)
-  reason=$(jq -er '.reason | tostring' <<< "$input" 2> /dev/null) ||
+  reason=$(jq -er '.reason // empty | tostring' <<< "$input" 2> /dev/null) ||
     die 'Expected {"reason": ...} on stdin'
   json=$(get "${run}api/json?tree=$tree") || exit 1
   # A matrix configuration is built by building the matrix job
