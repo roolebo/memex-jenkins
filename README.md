@@ -7,7 +7,8 @@ memex's [ci.md].
 
 ADDR is the URL of a job, a folder or the server; a folder or the server
 stands for every job under it. The adapter uses `api/json` with the user
-and API token for ADDR's host in `~/.netrc`.
+and API token from JENKINS_USER and JENKINS_TOKEN, or else from
+`~/.netrc` for ADDR's host; without them it reads anonymously.
 
 `detect` prints nothing.
 
