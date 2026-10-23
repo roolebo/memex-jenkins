@@ -12,7 +12,7 @@ set -e
 
 CURDIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 ADAPTER=$(dirname "$CURDIR")/memex-jenkins
-ADDR=https://ci.example.org/job/lustre-reviews
+ADDR=https://ci.example.org/job/project-reviews
 # A token curl's config must quote
 SECRET='pa"ss\word'
 DIR=$(mktemp -d)
@@ -153,7 +153,7 @@ test_runs_matrix() {
   route_matrix
   call runs cdc3609
   check status "$STATUS" 0
-  check runs "$(records '[.[].id | sub(".*/lustre-reviews/"; "")] | .[]')" \
+  check runs "$(records '[.[].id | sub(".*/project-reviews/"; "")] | .[]')" \
     "arch=aarch64,build_type=client,distro=rocky9.5,ib_stack=inkernel/134377/
 arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/
 arch=x86_64,build_type=client,distro=el10.0,ib_stack=inkernel/134371/"
@@ -262,7 +262,7 @@ EOF
 # A build without Gerrit names the commit it built
 test_run_aborted() {
   ADDR=https://ci.example.org
-  local run=$ADDR/job/lustre-master/4567
+  local run=$ADDR/job/project-master/4567
   route GET "$run/api/json?tree=$BUILD" run-master.json
   call run "$run"
   check status "$STATUS" 0
@@ -283,7 +283,7 @@ test_run_missing() {
 
 test_run_not_under() {
   login
-  call run https://other.example.org/job/lustre-reviews/1/
+  call run https://other.example.org/job/project-reviews/1/
   check status "$STATUS" 1
   check requests "$(requests length)" 0
 }
@@ -384,13 +384,13 @@ EOF
   check_json artifacts '.[1:] | map([.data.name, .data.url])' << EOF
 [["artifacts/repodata/bac1c300-primary.xml.gz",
   "${EL9}artifact/artifacts/repodata/bac1c300-primary.xml.gz"],
- ["artifacts/RPMS/x86_64/lustre 2.16#1+rc.rpm",
-  "${EL9}artifact/artifacts/RPMS/x86_64/lustre%202.16%231%2Brc.rpm"]]
+ ["artifacts/RPMS/x86_64/project 2.16#1+rc.rpm",
+  "${EL9}artifact/artifacts/RPMS/x86_64/project%202.16%231%2Brc.rpm"]]
 EOF
 }
 
 test_logs_running() {
-  local run=https://ci.example.org/job/lustre-master/4568
+  local run=https://ci.example.org/job/project-master/4568
   ADDR=https://ci.example.org
   route GET "$run/api/json?tree=url,result,artifacts[relativePath]" \
     artifacts-running.json
@@ -414,7 +414,7 @@ RETEST='_class,url,actions[parameters[name,value]]'
 # build's parameters, the reason as the cause
 test_retest_matrix() {
   login
-  echo '{"reason": "LU-930: flaky test"}' > "$IN"
+  echo '{"reason": "PRJ-930: flaky test"}' > "$IN"
   route GET "${EL9}api/json?tree=$RETEST" retest-run.json
   route POST "$ADDR/buildWithParameters" - 201
   call retest "$EL9"
@@ -425,19 +425,19 @@ test_retest_matrix() {
   check body "$(requests '.[1].body | split("&") | .[]')" \
     'GERRIT_CHANGE_NUMBER=69978
 GERRIT_REFSPEC=refs%2Fchanges%2F78%2F69978%2F2
-GERRIT_CHANGE_SUBJECT=LU-930%20doc%3A%20fix%20a%20%26%20b
-cause=LU-930%3A%20flaky%20test'
+GERRIT_CHANGE_SUBJECT=PRJ-930%20doc%3A%20fix%20a%20%26%20b
+cause=PRJ-930%3A%20flaky%20test'
   check auth "$(requests '.[1].auth')" stdin
   check "body on the command line" \
     "$(requests '.[1].args | map(select(contains("cause"))) | length')" 0
 }
 
 test_retest_freestyle() {
-  local run=https://ci.example.org/job/lustre-master/4567/
+  local run=https://ci.example.org/job/project-master/4567/
   ADDR=https://ci.example.org
   echo '{"reason": 12}' > "$IN"
   route GET "${run}api/json?tree=$RETEST" retest-master.json
-  route POST "$ADDR/job/lustre-master/buildWithParameters" - 201
+  route POST "$ADDR/job/project-master/buildWithParameters" - 201
   call retest "$run"
   check status "$STATUS" 0
   check body "$(requests '.[1].body')" cause=12
@@ -447,7 +447,7 @@ test_retest_no_reason() {
   echo '{}' > "$IN"
   call retest "$EL9"
   check empty "$STATUS" 1
-  echo 'LU-930' > "$IN"
+  echo 'PRJ-930' > "$IN"
   call retest "$EL9"
   check "not JSON" "$STATUS" 1
   check requests "$(requests length)" 0

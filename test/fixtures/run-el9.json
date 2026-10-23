@@ -13,5 +13,5 @@
   "duration": 3100000,
   "result": "UNSTABLE",
   "timestamp": 1792761426000,
-  "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"
+  "url": "https://ci.example.org/job/project-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"
 }

@@ -8,9 +8,9 @@
   "duration": 0,
   "result": null,
   "timestamp": 1792760000000,
-  "url": "https://ci.example.org/job/lustre-reviews/134371/",
+  "url": "https://ci.example.org/job/project-reviews/134371/",
   "number": 134371,
   "runs": [
-    {"_class": "hudson.matrix.MatrixRun", "building": true, "duration": 0, "number": 134371, "result": null, "timestamp": 1792760001000, "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=client,distro=el10.0,ib_stack=inkernel/134371/"}
+    {"_class": "hudson.matrix.MatrixRun", "building": true, "duration": 0, "number": 134371, "result": null, "timestamp": 1792760001000, "url": "https://ci.example.org/job/project-reviews/arch=x86_64,build_type=client,distro=el10.0,ib_stack=inkernel/134371/"}
   ]
 }

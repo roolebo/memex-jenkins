@@ -8,5 +8,5 @@
   "duration": 61000,
   "result": "ABORTED",
   "timestamp": 1792000000000,
-  "url": "https://ci.example.org/job/lustre-master/4567/"
+  "url": "https://ci.example.org/job/project-master/4567/"
 }

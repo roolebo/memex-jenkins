@@ -14,7 +14,7 @@
         {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "f6b4b8962ee992b3865774309071125ce05db09d"}},
         {"_class": "org.jenkinsci.plugins.displayurlapi.actions.RunDisplayAction"}
       ],
-      "url": "https://ci.example.org/job/lustre-reviews/134380/"
+      "url": "https://ci.example.org/job/project-reviews/134380/"
     },
     {
       "_class": "hudson.matrix.MatrixBuild",
@@ -27,7 +27,7 @@
         ]},
         {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}}
       ],
-      "url": "https://ci.example.org/job/lustre-reviews/134377/"
+      "url": "https://ci.example.org/job/project-reviews/134377/"
     },
     {
       "_class": "hudson.matrix.MatrixBuild",
@@ -35,7 +35,7 @@
         {"_class": "hudson.model.CauseAction"},
         {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}}
       ],
-      "url": "https://ci.example.org/job/lustre-reviews/134371/"
+      "url": "https://ci.example.org/job/project-reviews/134371/"
     },
     {
       "_class": "hudson.matrix.MatrixBuild",
@@ -47,7 +47,7 @@
           {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_PATCHSET_REVISION", "value": "a05e3830fc9922d3e31159e8ab602b410fca9c5f"}
         ]}
       ],
-      "url": "https://ci.example.org/job/lustre-reviews/134360/"
+      "url": "https://ci.example.org/job/project-reviews/134360/"
     }
   ]
 }
