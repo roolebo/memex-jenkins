@@ -3,7 +3,7 @@
 # memex-jenkins: memex adapter for the ci role in Jenkins.
 #
 #   memex-jenkins detect REPO
-#   memex-jenkins ADDR COMMAND [ARGUMENTS]
+#   memex-jenkins ADDR ROLE COMMAND [ARGUMENTS]
 #
 # README.md specifies the mapping. Credentials come from JENKINS_USER and
 # JENKINS_TOKEN (an API token), e.g. set by withkeys, or else from
@@ -31,13 +31,13 @@ unsupported() {
 usage() {
   cat << EOF
 Usage: $0 detect REPO
-       $0 ADDR capabilities
-       $0 ADDR runs COMMIT
-       $0 ADDR run RUN
-       $0 ADDR suites RUN
-       $0 ADDR tests SUITE
-       $0 ADDR logs ID
-       $0 ADDR retest RUN < REASON
+       $0 ADDR ci capabilities
+       $0 ADDR ci runs COMMIT
+       $0 ADDR ci run RUN
+       $0 ADDR ci suites RUN
+       $0 ADDR ci tests SUITE
+       $0 ADDR ci logs ID
+       $0 ADDR ci retest RUN < REASON
 EOF
 }
 
@@ -284,7 +284,13 @@ if [ "$1" == detect ]; then
   detect "$2"
   exit 0
 fi
-[ $# -ge 2 ] || die "$(usage)"
+[ $# -ge 3 ] || die "$(usage)"
+if [ "$2" != ci ]; then
+  echo "Not a $2 adapter" >&2
+  exit 2
+fi
+# Drop ROLE: the commands below take ADDR COMMAND [ARGUMENTS]
+set -- "$1" "${@:3}"
 
 ADDR=${1%/}
 [[ "$ADDR" =~ $HOST_RE ]] || die "Not an http(s) URL: $1"
