@@ -2,7 +2,6 @@
 #
 # memex-jenkins: memex adapter for the ci role in Jenkins.
 #
-#   memex-jenkins detect REPO
 #   memex-jenkins ADDR ROLE COMMAND [ARGUMENTS]
 #
 # README.md specifies the mapping. Credentials come from JENKINS_USER and
@@ -30,8 +29,7 @@ unsupported() {
 
 usage() {
   cat << EOF
-Usage: $0 detect REPO
-       $0 ADDR ci capabilities
+Usage: $0 ADDR ci capabilities
        $0 ADDR ci runs COMMIT
        $0 ADDR ci run RUN
        $0 ADDR ci suites RUN
@@ -39,11 +37,6 @@ Usage: $0 detect REPO
        $0 ADDR ci logs ID
        $0 ADDR ci retest RUN < REASON
 EOF
-}
-
-# Jenkins isn't named in a working copy, so this recognizes nothing
-detect() {
-  [ -d "$1" ] || die "No such directory: $1"
 }
 
 HOST_RE='^https?://[^/]+'
@@ -277,11 +270,6 @@ retest() {
 
 if [ "$1" == "-h" -o "$1" == "--help" ]; then
   usage
-  exit 0
-fi
-if [ "$1" == detect ]; then
-  [ $# -eq 2 ] || die "$(usage)"
-  detect "$2"
   exit 0
 fi
 [ $# -ge 3 ] || die "$(usage)"

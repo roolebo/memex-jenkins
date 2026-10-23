@@ -10,7 +10,6 @@ stands for every job under it. The adapter uses `api/json` with the user
 and API token from JENKINS_USER and JENKINS_TOKEN, or else from
 `~/.netrc` for ADDR's host; without them it reads anonymously.
 
-`detect` prints nothing.
 
 ## Commands
 
