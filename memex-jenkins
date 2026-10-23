@@ -292,6 +292,6 @@ case "$2" in
     "$2" "$3"
     ;;
   *)
-    die "$(usage)"
+    unsupported "$2"
     ;;
 esac
