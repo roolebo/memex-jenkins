@@ -1,0 +1,23 @@
+{
+  "_class": "hudson.matrix.MatrixBuild",
+  "actions": [
+    {"_class": "hudson.model.CauseAction"},
+    {"_class": "hudson.model.ParametersAction", "parameters": [
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_CHANGE_NUMBER", "value": "69978"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_PATCHSET_NUMBER", "value": "2"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_PATCHSET_REVISION", "value": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}
+    ]},
+    {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}}
+  ],
+  "building": false,
+  "duration": 3120456,
+  "result": "FAILURE",
+  "timestamp": 1792761423621,
+  "url": "https://ci.example.org/job/lustre-reviews/134377/",
+  "number": 134377,
+  "runs": [
+    {"_class": "hudson.matrix.MatrixRun", "building": false, "duration": 1850000, "number": 134377, "result": "SUCCESS", "timestamp": 1792761425000, "url": "https://ci.example.org/job/lustre-reviews/arch=aarch64,build_type=client,distro=rocky9.5,ib_stack=inkernel/134377/"},
+    {"_class": "hudson.matrix.MatrixRun", "building": false, "duration": 3100000, "number": 134377, "result": "FAILURE", "timestamp": 1792761426000, "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"},
+    {"_class": "hudson.matrix.MatrixRun", "building": false, "duration": 1700000, "number": 134356, "result": "SUCCESS", "timestamp": 1792700000000, "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=client,distro=sles15sp4,ib_stack=inkernel/134356/"}
+  ]
+}

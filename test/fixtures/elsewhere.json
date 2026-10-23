@@ -1,0 +1,1 @@
+{"_class": "hudson.model.Hudson", "jobs": [{"_class": "hudson.model.FreeStyleProject", "url": "https://other.example.org/job/lustre-reviews/"}]}

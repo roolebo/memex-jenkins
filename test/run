@@ -128,6 +128,166 @@ test_usage() {
   check requests "$(requests length)" 0
 }
 
+REVISION='actions[parameters[name,value],lastBuiltRevision[SHA1]]'
+BUILD="url,_class,result,building,timestamp,duration,$REVISION"
+RUNS="$BUILD,number,runs[number,url,result,building,timestamp,duration]"
+SHA=cdc360986f2590957d6fb1296b7bccfa5fdafa34
+EL9=$ADDR/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/
+
+# The builds of the job or folder at URL: FIXTURE [CODE]
+route_builds() {
+  route GET "$1/api/json?tree=jobs[url],builds[url,$REVISION]" \
+    "$2" "${3:-200}"
+}
+
+# Two matrix builds of SHA: 134377 for change 69978, and 134371 without
+# Gerrit
+route_matrix() {
+  route_builds "$ADDR" job.json
+  route GET "$ADDR/134377/api/json?tree=$RUNS" build-134377.json
+  route GET "$ADDR/134371/api/json?tree=$RUNS" build-134371.json
+}
+
+# Each configuration of this round of a matrix build is a run
+test_runs_matrix() {
+  route_matrix
+  call runs cdc3609
+  check status "$STATUS" 0
+  check runs "$(records '[.[].id | sub(".*/lustre-reviews/"; "")] | .[]')" \
+    "arch=aarch64,build_type=client,distro=rocky9.5,ib_stack=inkernel/134377/
+arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/
+arch=x86_64,build_type=client,distro=el10.0,ib_stack=inkernel/134371/"
+  check_json run '.[1]' << EOF
+{"id": "$EL9", "source": "$ADDR", "role": "ci", "kind": "run",
+ "basis": "FAILURE",
+ "links": [["commit", "$SHA"], ["change", "69978"], ["revision", "2"]],
+ "data": {"commit": "$SHA", "status": "done", "result": "fail",
+          "started": "2026-10-23T13:17:06Z",
+          "finished": "2026-10-23T14:08:46Z", "url": "$EL9",
+          "config": {"arch": "x86_64", "build_type": "server",
+                     "distro": "el9.7", "ib_stack": "inkernel"}},
+ "notes": {}}
+EOF
+  check_json running '.[2] | [.basis, .links, .data.status,
+      .data.result, .data.finished]' << EOF
+["running", [["commit", "$SHA"]], "running", null, null]
+EOF
+  check anonymous "$(requests '[.[].auth] | unique | .[]')" netrc-optional
+}
+
+test_runs_full_commit() {
+  route_builds "$ADDR" job.json
+  route GET "$ADDR/134380/api/json?tree=$RUNS" build-134377.json
+  call runs f6b4b8962ee992b3865774309071125ce05db09d
+  check status "$STATUS" 0
+  check count "$(records length)" 2
+}
+
+test_runs_none() {
+  route_builds "$ADDR" job.json
+  call runs 0123456789ab
+  check status "$STATUS" 0
+  check output "$OUT" ''
+  check requests "$(requests length)" 1
+}
+
+test_runs_not_a_commit() {
+  call runs CDC3609
+  check uppercase "$STATUS" 1
+  call runs cdc360
+  check short "$STATUS" 1
+  check requests "$(requests length)" 0
+}
+
+# A server or folder stands for every job under it
+test_runs_folder() {
+  local tools=https://ci.example.org/job/tools
+  route_matrix
+  route_builds "$tools" folder.json
+  route_builds "$tools/job/lint" lint.json
+  route GET "$tools/job/lint/88/api/json?tree=$RUNS" lint-88.json
+  ADDR=https://ci.example.org
+  route_builds "$ADDR" root.json
+  call runs cdc3609
+  check status "$STATUS" 0
+  check count "$(records length)" 4
+  check_json lint '.[3] | [.id, .source, .links, .data.config,
+      .data.result]' << EOF
+["https://ci.example.org/job/tools/job/lint/88/", "https://ci.example.org",
+ [["commit", "$SHA"]], {}, "pass"]
+EOF
+}
+
+# Credentials go only to URLs under ADDR
+test_runs_not_under() {
+  login
+  ADDR=https://ci.example.org
+  route_builds "$ADDR" elsewhere.json
+  call runs cdc3609
+  check status "$STATUS" 1
+  check_has error "$ERR" \
+    'Not under https://ci.example.org: https://other.example.org/'
+  check requests "$(requests length)" 1
+}
+
+test_runs_fail() {
+  route_builds "$ADDR" not-found.html 500
+  call runs cdc3609
+  check status "$STATUS" 1
+  check_has error "$ERR" "Cannot read $ADDR/api/json: HTTP 500"
+}
+
+# The token goes to curl in its config on stdin
+test_runs_logged_in() {
+  login
+  route_matrix
+  call runs cdc3609
+  check status "$STATUS" 0
+  check auth "$(requests '[.[].auth] | unique | .[]')" stdin
+  check user "$(requests '[.[].user] | unique | .[]')" "CORP\\jdoe:$SECRET"
+}
+
+test_run() {
+  route GET "${EL9}api/json?tree=$BUILD" run-el9.json
+  call run "$EL9"
+  check status "$STATUS" 0
+  check_json run '.[0] | [.id, .basis, .links, .data.result,
+      .data.config.distro]' << EOF
+["$EL9", "UNSTABLE",
+ [["commit", "$SHA"], ["change", "69978"], ["revision", "2"]],
+ "fail", "el9.7"]
+EOF
+}
+
+# A build without Gerrit names the commit it built
+test_run_aborted() {
+  ADDR=https://ci.example.org
+  local run=$ADDR/job/lustre-master/4567
+  route GET "$run/api/json?tree=$BUILD" run-master.json
+  call run "$run"
+  check status "$STATUS" 0
+  check_json run '.[0] | [.links, .data]' << EOF
+[[["commit", "9a1b2c3d4e5f60718293a4b5c6d7e8f901234567"]],
+ {"commit": "9a1b2c3d4e5f60718293a4b5c6d7e8f901234567", "status": "done",
+  "result": "error", "started": "2026-10-14T17:46:40Z",
+  "finished": "2026-10-14T17:47:41Z", "url": "$run/", "config": {}}]
+EOF
+}
+
+test_run_missing() {
+  route GET "$ADDR/1/api/json?tree=$BUILD" not-found.html 404
+  call run "$ADDR/1/"
+  check status "$STATUS" 1
+  check output "$OUT" ''
+}
+
+test_run_not_under() {
+  login
+  call run https://other.example.org/job/lustre-reviews/1/
+  check status "$STATUS" 1
+  check requests "$(requests length)" 0
+}
+
 run() {
   local failed=$FAILED
   TEST=$1

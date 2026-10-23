@@ -1,0 +1,1 @@
+{"_class": "com.cloudbees.hudson.plugins.folder.Folder", "jobs": [{"_class": "hudson.model.FreeStyleProject", "url": "https://ci.example.org/job/tools/job/lint/"}]}

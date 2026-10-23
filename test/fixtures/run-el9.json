@@ -1,0 +1,17 @@
+{
+  "_class": "hudson.matrix.MatrixRun",
+  "actions": [
+    {"_class": "hudson.model.ParametersAction", "parameters": [
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_CHANGE_NUMBER", "value": "69978"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_PATCHSET_NUMBER", "value": "2"},
+      {"_class": "hudson.model.StringParameterValue", "name": "GERRIT_PATCHSET_REVISION", "value": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}
+    ]},
+    {},
+    {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}}
+  ],
+  "building": false,
+  "duration": 3100000,
+  "result": "UNSTABLE",
+  "timestamp": 1792761426000,
+  "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"
+}

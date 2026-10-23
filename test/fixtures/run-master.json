@@ -1,0 +1,12 @@
+{
+  "_class": "hudson.model.FreeStyleBuild",
+  "actions": [
+    {"_class": "hudson.model.CauseAction"},
+    {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "9a1b2c3d4e5f60718293a4b5c6d7e8f901234567"}}
+  ],
+  "building": false,
+  "duration": 61000,
+  "result": "ABORTED",
+  "timestamp": 1792000000000,
+  "url": "https://ci.example.org/job/lustre-master/4567/"
+}

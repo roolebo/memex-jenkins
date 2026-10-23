@@ -1,0 +1,1 @@
+{"_class": "hudson.model.FreeStyleProject", "builds": [{"_class": "hudson.model.FreeStyleBuild", "actions": [{"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {"SHA1": "cdc360986f2590957d6fb1296b7bccfa5fdafa34"}}], "url": "https://ci.example.org/job/tools/job/lint/88/"}]}

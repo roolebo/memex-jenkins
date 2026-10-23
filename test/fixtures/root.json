@@ -1,0 +1,1 @@
+{"_class": "hudson.model.Hudson", "jobs": [{"_class": "hudson.matrix.MatrixProject", "url": "https://ci.example.org/job/lustre-reviews/"}, {"_class": "com.cloudbees.hudson.plugins.folder.Folder", "url": "https://ci.example.org/job/tools/"}]}
