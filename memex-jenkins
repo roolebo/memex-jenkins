@@ -1,0 +1,303 @@
+#!/usr/bin/env bash
+#
+# memex-jenkins: memex adapter for the ci role in Jenkins.
+#
+#   memex-jenkins detect REPO
+#   memex-jenkins ADDR COMMAND [ARGUMENTS]
+#
+# README.md specifies the mapping. Credentials come from JENKINS_USER and
+# JENKINS_TOKEN (an API token), e.g. set by withkeys, or else from
+# ~/.netrc for ADDR's host; without them only reading works, if the
+# server lets anonymous users read. Never prompts. Requests go only to
+# URLs under ADDR, so credentials never leave it.
+#
+# runs COMMIT looks only at the builds Jenkins lists in each job's
+# `builds`: its newest 100. A folder or server ADDR costs a request per
+# job under it, and one more per build that tested COMMIT.
+#
+
+set -e
+
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+unsupported() {
+  echo "Not supported: $1" >&2
+  exit 2
+}
+
+usage() {
+  cat << EOF
+Usage: $0 detect REPO
+       $0 ADDR capabilities
+       $0 ADDR runs COMMIT
+       $0 ADDR run RUN
+       $0 ADDR suites RUN
+       $0 ADDR tests SUITE
+       $0 ADDR logs ID
+       $0 ADDR retest RUN < REASON
+EOF
+}
+
+# Jenkins isn't named in a working copy, so this recognizes nothing
+detect() {
+  [ -d "$1" ] || die "No such directory: $1"
+}
+
+HOST_RE='^https?://[^/]+'
+
+# Prints the curl config lines that authenticate
+auth() {
+  if [ -n "$JENKINS_USER" -a -n "$JENKINS_TOKEN" ]; then
+    printf 'user = "%s:%s"\n' "$JENKINS_USER" "$JENKINS_TOKEN"
+  else
+    echo netrc-optional
+  fi
+}
+
+under() {
+  [[ "$1" == "$ADDR"/* ]] || die "Not under $ADDR: ${1%%\?*}"
+}
+
+# GET a URL under ADDR and print the reply; with "optional", a missing
+# page prints nothing
+get() {
+  local reply
+  local code
+  under "$1"
+  # The token goes to curl on stdin, not on its command line
+  reply=$(auth | curl -gsS -K - -w '\n%{http_code}' "$1") ||
+    die "Cannot read ${1%%\?*}"
+  code=$(tail -1 <<< "$reply")
+  [ "$code" == 404 -a "$2" == optional ] && return 0
+  [ "$code" == 200 ] || die "Cannot read ${1%%\?*}: HTTP $code"
+  sed '$d' <<< "$reply"
+}
+
+# jq definitions shared by the commands
+JQ_DEFS='
+def time: . / 1000 | floor | todate;
+def record($kind; $id; $basis; $links; $data): {
+  id: $id, source: $addr, role: "ci", kind: $kind,
+  basis: $basis, links: $links, data: $data, notes: {}
+};
+def param($name):
+  [.actions[]?.parameters[]? | select(.name == $name) | .value][0];
+def sha1: [.actions[]?.lastBuiltRevision.SHA1 // empty][0];
+def commits:
+  [param("GERRIT_PATCHSET_REVISION"), sha1] | map(select(.)) | unique;
+def commit_links: commits | map(["commit", .]);
+def result:
+  if .result == null then null
+  else {SUCCESS: "pass", UNSTABLE: "fail", FAILURE: "fail",
+        NOT_BUILT: "skip", ABORTED: "error"}[.result] // "error" end;
+def config:
+  (.url | split("/") | .[-3]) as $axes
+  | if $axes | contains("=") then
+      [$axes | split(",")[] | split("=")
+       | {key: .[0], value: (.[1:] | join("="))}] | from_entries
+    else {} end;
+def run_record: record("run"; .url; (.result // "running");
+  commit_links
+  + [param("GERRIT_CHANGE_NUMBER") // empty | ["change", .]]
+  + [param("GERRIT_PATCHSET_NUMBER") // empty | ["revision", .]];
+  {
+    commit: (param("GERRIT_PATCHSET_REVISION") // sha1),
+    status: (if .building then "running" else "done" end),
+    result: result,
+    started: (.timestamp | time),
+    finished: (if .building then null
+               else (.timestamp + .duration) | time end),
+    url: .url,
+    config: config
+  });
+def case_result:
+  {PASSED: "pass", FIXED: "pass", FAILED: "fail", REGRESSION: "fail",
+   SKIPPED: "skip"}[.status] // "error";
+'
+
+REVISION='actions[parameters[name,value],lastBuiltRevision[SHA1]]'
+BUILD="url,_class,result,building,timestamp,duration,$REVISION"
+
+# Prints the run records of the build at URL: its configurations if it
+# is a matrix build, else the build itself
+build_runs() {
+  local tree="$BUILD,number,runs[number,url,result,building,timestamp,duration]"
+  local json
+  json=$(get "${1}api/json?tree=$tree") || exit 1
+  jq -c --arg addr "$ADDR" "$JQ_DEFS"'
+      if .runs then
+        . as $build | .runs[] | select(.number == $build.number)
+        | . + {actions: $build.actions}
+      else . end
+      | run_record' <<< "$json"
+}
+
+# Prints the run records of the builds of the job or folder at URL that
+# tested COMMIT
+scan() {
+  local json
+  local url
+  json=$(get "$1/api/json?tree=jobs[url],builds[url,$REVISION]") || exit 1
+  for url in $(jq -r --arg commit "$COMMIT" "$JQ_DEFS"'
+      .builds[]? | select(commits | any(startswith($commit)))
+      | .url' <<< "$json"); do
+    build_runs "$url"
+  done
+  for url in $(jq -r '.jobs[]?.url' <<< "$json"); do
+    scan "${url%/}"
+  done
+}
+
+runs() {
+  [[ "$1" =~ ^[0-9a-f]{7,40}$ ]] || die "Not a commit: $1"
+  COMMIT=$1
+  scan "$ADDR"
+}
+
+run() {
+  local json
+  json=$(get "${1%/}/api/json?tree=$BUILD") || exit 1
+  jq -c --arg addr "$ADDR" "$JQ_DEFS"'run_record' <<< "$json"
+}
+
+# Prints the commit links of the run at URL
+run_links() {
+  local json
+  json=$(get "${1}api/json?tree=$REVISION") || exit 1
+  jq -c "$JQ_DEFS"'commit_links' <<< "$json"
+}
+
+suites() {
+  local run=${1%/}/
+  local tree='suites[name,duration,cases[status]]'
+  local links
+  local json
+  json=$(get "${run}testReport/api/json?tree=$tree" optional) || exit 1
+  [ -n "$json" ] || return 0
+  links=$(run_links "$run") || exit 1
+  jq -c --arg addr "$ADDR" --arg run "$run" --argjson links "$links" \
+    "$JQ_DEFS"'
+      .suites | to_entries[] | .key as $i | .value
+      | ([.cases[] | case_result] | group_by(.)
+         | map({key: .[0], value: length}) | from_entries) as $counts
+      | record("suite"; "\($run)#\($i)"; ($counts | tojson); $links;
+          {
+            run: $run,
+            name: .name,
+            result: (if $counts.fail then "fail"
+                     elif $counts.error then "error"
+                     elif $counts.pass or ($counts | length) == 0 then "pass"
+                     else "skip" end),
+            counts: $counts,
+            duration: .duration,
+            url: ($run + "testReport/")
+          })' <<< "$json"
+}
+
+tests() {
+  local run=${1%#*}
+  local index=${1##*#}
+  local fields='className,name,status,duration,errorDetails,errorStackTrace'
+  local tree
+  local links
+  local json
+  [[ "$1" == *#* && "$index" =~ ^[0-9]+$ ]] || die "Not a suite: $1"
+  # Only the suite's own cases: a report can hold thousands
+  tree="suites[cases[$fields]]{$index,$((index + 1))}"
+  json=$(get "${run}testReport/api/json?tree=$tree") || exit 1
+  [ "$(jq '.suites | length' <<< "$json")" -gt 0 ] ||
+    die "No such suite: $1"
+  links=$(run_links "$run") || exit 1
+  jq -c --arg addr "$ADDR" --arg suite "$1" --argjson links "$links" \
+    "$JQ_DEFS"'
+      .suites[0].cases | to_entries[] | .key as $i | .value
+      | record("test"; "\($suite)#\($i)"; .status; $links;
+          {
+            suite: $suite,
+            name: ([.className, .name] | map(select(. and . != ""))
+                   | join(".")),
+            result: case_result,
+            error: ((.errorDetails // .errorStackTrace)
+                    | if . then split("\n")[0] else null end),
+            duration: .duration,
+            url: null
+          })' <<< "$json"
+}
+
+# Jenkins keeps logs per build, not per suite or test
+logs() {
+  local run=${1%/}/
+  local json
+  [[ "$1" == *#* ]] && unsupported "logs of a suite or test"
+  json=$(get "${run}api/json?tree=url,result,artifacts[relativePath]") ||
+    exit 1
+  jq -c --arg addr "$ADDR" "$JQ_DEFS"'
+      .url as $run | (.result // "running") as $basis
+      | def log($name; $url): record("log"; $url; $basis; [];
+          {of: $run, name: $name, url: $url, size: null});
+      log("console.log"; $run + "consoleText"),
+      (.artifacts[] | log(.relativePath; $run + "artifact/"
+        + (.relativePath | split("/") | map(@uri) | join("/"))))' <<< "$json"
+}
+
+# Queues the job of RUN again with RUN's parameters. Jenkins records the
+# reason, as `cause`, only for builds triggered with the job's token.
+retest() {
+  local run=${1%/}/
+  local input
+  local reason
+  local json
+  local tree='_class,url,actions[parameters[name,value]]'
+  local job
+  local body
+  input=$(cat)
+  reason=$(jq -er '.reason | tostring' <<< "$input" 2> /dev/null) ||
+    die 'Expected {"reason": ...} on stdin'
+  json=$(get "${run}api/json?tree=$tree") || exit 1
+  # A matrix configuration is built by building the matrix job
+  job=$(jq -r 'if ._class == "hudson.matrix.MatrixRun" then
+        .url | sub("[^/]+/[0-9]+/$"; "")
+      else .url | sub("[0-9]+/$"; "") end' <<< "$json")
+  under "$job"
+  # URI-encoded, the body needs no quoting in curl's config
+  body=$(jq -r --arg reason "$reason" '
+      [.actions[]?.parameters[]? | select(.value != null)
+       | "\(.name | @uri)=\(.value | tostring | @uri)"]
+      + ["cause=\($reason | @uri)"] | join("&")' <<< "$json")
+  {
+    auth
+    echo "data = \"$body\""
+  } |
+    curl -gfsS -K - -o /dev/null "${job}buildWithParameters" ||
+    die "Cannot retest $run"
+}
+
+if [ "$1" == "-h" -o "$1" == "--help" ]; then
+  usage
+  exit 0
+fi
+if [ "$1" == detect ]; then
+  [ $# -eq 2 ] || die "$(usage)"
+  detect "$2"
+  exit 0
+fi
+[ $# -ge 2 ] || die "$(usage)"
+
+ADDR=${1%/}
+[[ "$ADDR" =~ $HOST_RE ]] || die "Not an http(s) URL: $1"
+
+case "$2" in
+  capabilities)
+    echo '{"tests": true, "logs": true, "retest": true, "bugs": false}'
+    ;;
+  runs | run | suites | tests | logs | retest)
+    [ $# -eq 3 ] || die "$(usage)"
+    "$2" "$3"
+    ;;
+  *)
+    die "$(usage)"
+    ;;
+esac
