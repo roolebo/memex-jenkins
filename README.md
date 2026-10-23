@@ -3,6 +3,8 @@
 A [memex] adapter for the `ci` role in Jenkins. The role is specified in
 memex's [ci.md].
 
+Tests run offline, with a fake curl: `test/run [TEST...]`.
+
 ## Reaching Jenkins
 
 ADDR is the URL of a job, a folder or the server; a folder or the server

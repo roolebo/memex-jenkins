@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+#
+# test/run: tests of memex-jenkins, offline.
+#
+# curl is test/bin/curl, a fake that answers from fixtures in
+# test/fixtures and logs what the adapter asked. Each test gets its own
+# routes, log and HOME under a temporary directory; JENKINS_USER and
+# JENKINS_TOKEN are unset unless the test sets them.
+#
+
+set -e
+
+CURDIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+ADAPTER=$(dirname "$CURDIR")/memex-jenkins
+ADDR=https://ci.example.org/job/lustre-reviews
+# A token curl's config must quote
+SECRET='pa"ss\word'
+DIR=$(mktemp -d)
+FAILED=0
+
+die() {
+  echo "$*" >&2
+  exit 1
+}
+
+usage() {
+  cat << EOF
+Usage: $0 [TEST...]
+
+Runs the given tests, or all of them:
+$(declare -F | cut -d' ' -f3 | grep '^test_' | sed 's/^/  /')
+EOF
+}
+
+cleanup() {
+  rm -rf "$DIR"
+}
+
+# Answer METHOD URL with test/fixtures/FIXTURE, or nothing for -, and
+# HTTP status CODE, 200 by default
+route() {
+  echo "$1 $2 $3 ${4:-200}" >> "$FAKE/routes"
+}
+
+# Run the adapter's ci role: ARGS, stdin from IN; sets OUT, ERR and
+# STATUS
+call() {
+  STATUS=0
+  "$ADAPTER" "$ADDR" ci "$@" < "$IN" > "$TEST_DIR/out" \
+    2> "$TEST_DIR/err" || STATUS=$?
+  OUT=$(< "$TEST_DIR/out")
+  ERR=$(< "$TEST_DIR/err")
+}
+
+# jq FILTER on the records printed, as one array
+records() {
+  jq -scr "$1" <<< "$OUT"
+}
+
+# jq FILTER on the requests curl got, as one array
+requests() {
+  touch "$FAKE/log"
+  jq -scr "$1" "$FAKE/log"
+}
+
+login() {
+  export JENKINS_USER='CORP\jdoe' JENKINS_TOKEN=$SECRET
+}
+
+check() {
+  [ "$2" == "$3" ] && return
+  echo "# $1: expected '$3', got '$2'"
+  FAILED=$((FAILED + 1))
+}
+
+check_has() {
+  [[ $2 == *"$3"* ]] && return
+  echo "# $1: '$2' lacks '$3'"
+  FAILED=$((FAILED + 1))
+}
+
+# Compare jq FILTER on the records with the JSON on stdin
+check_json() {
+  check "$1" "$(jq -sc "$2" <<< "$OUT" | jq -cS .)" "$(jq -cS .)"
+}
+
+# Fails a test that asked for something without a route or put the
+# token on curl's command line
+audit() {
+  local bad
+  [ -f "$FAKE/log" ] || return 0
+  bad=$(jq -r --arg secret "$SECRET" '
+      if .unexpected then "unexpected request: \(.method) \(.url)"
+      elif (.args + [.url] | any(contains($secret)))
+      then "token on the command line: \(.url)"
+      else empty end' "$FAKE/log")
+  [ -n "$bad" ] || return 0
+  sed 's/^/# /' <<< "$bad"
+  FAILED=$((FAILED + 1))
+}
+
+test_capabilities() {
+  call capabilities
+  check status "$STATUS" 0
+  check_json capabilities '.[0]' << 'EOF'
+{"tests": true, "logs": true, "retest": true, "bugs": false}
+EOF
+  check requests "$(requests length)" 0
+}
+
+test_other_role() {
+  STATUS=0
+  "$ADAPTER" "$ADDR" tracker capabilities < "$IN" 2> /dev/null || STATUS=$?
+  check status "$STATUS" 2
+}
+
+test_unknown_command() {
+  call locate cdc3609
+  check status "$STATUS" 2
+}
+
+test_usage() {
+  call run
+  check "no run" "$STATUS" 1
+  STATUS=0
+  "$ADAPTER" ci.example.org ci run 1 < "$IN" 2> /dev/null || STATUS=$?
+  check "not a URL" "$STATUS" 1
+  check requests "$(requests length)" 0
+}
+
+run() {
+  local failed=$FAILED
+  TEST=$1
+  TEST_DIR=$DIR/$1
+  IN=$TEST_DIR/in
+  mkdir -p "$TEST_DIR/home"
+  : > "$IN"
+  (
+    export HOME=$TEST_DIR/home
+    export FAKE=$TEST_DIR
+    "$1"
+    audit
+    exit $((FAILED - failed))
+  ) || FAILED=$((FAILED + $?))
+  if [ $FAILED -eq $failed ]; then
+    echo "ok $1"
+  else
+    echo "not ok $1"
+  fi
+}
+
+if [ "$1" == "-h" -o "$1" == "--help" ]; then
+  usage
+  exit 0
+fi
+command -v jq > /dev/null || die "jq is not installed"
+trap cleanup EXIT
+export PATH=$CURDIR/bin:$PATH
+[ "$(command -v curl)" == "$CURDIR/bin/curl" ] || die "curl is not the fake"
+export FIXTURES=$CURDIR/fixtures
+unset JENKINS_USER JENKINS_TOKEN
+
+TESTS=("$@")
+[ $# -gt 0 ] || TESTS=($(declare -F | cut -d' ' -f3 | grep '^test_'))
+for test in "${TESTS[@]}"; do
+  declare -F "$test" > /dev/null || die "No such test: $test"
+  run "$test"
+done
+[ $FAILED -eq 0 ] || die "$FAILED failed"
