@@ -288,6 +288,126 @@ test_run_not_under() {
   check requests "$(requests length)" 0
 }
 
+SUITES='suites[name,duration,cases[status]]'
+CASES='className,name,status,duration,errorDetails,errorStackTrace'
+
+test_suites() {
+  route GET "${EL9}testReport/api/json?tree=$SUITES" report.json
+  route GET "${EL9}api/json?tree=$REVISION" revision.json
+  call suites "$EL9"
+  check status "$STATUS" 0
+  check_json sanity '.[0]' << EOF
+{"id": "$EL9#0", "source": "$ADDR", "role": "ci", "kind": "suite",
+ "basis": "{\"fail\":2,\"pass\":2,\"skip\":1}",
+ "links": [["commit", "$SHA"]],
+ "data": {"run": "$EL9", "name": "sanity", "result": "fail",
+          "counts": {"pass": 2, "fail": 2, "skip": 1}, "duration": 412.5,
+          "url": "${EL9}testReport/"},
+ "notes": {}}
+EOF
+  check_json others '.[1:] | map([.id, .data.name, .data.result,
+      .data.counts])' << EOF
+[["$EL9#1", "conf-sanity", "pass", {"pass": 2}],
+ ["$EL9#2", "sanity-hsm", "skip", {"skip": 1}],
+ ["$EL9#3", "empty", "pass", {}]]
+EOF
+}
+
+# A build without a test report has no suites
+test_suites_no_report() {
+  route GET "${EL9}testReport/api/json?tree=$SUITES" not-found.html 404
+  call suites "$EL9"
+  check status "$STATUS" 0
+  check output "$OUT" ''
+  check requests "$(requests length)" 1
+}
+
+test_suites_fail() {
+  route GET "${EL9}testReport/api/json?tree=$SUITES" not-found.html 503
+  call suites "$EL9"
+  check status "$STATUS" 1
+  check output "$OUT" ''
+}
+
+# Only the suite's own cases are asked for
+test_tests() {
+  route GET "${EL9}testReport/api/json?tree=suites[cases[$CASES]]{0,1}" \
+    report-suite0.json
+  route GET "${EL9}api/json?tree=$REVISION" revision.json
+  call tests "$EL9#0"
+  check status "$STATUS" 0
+  check_json failed '.[2]' << EOF
+{"id": "$EL9#0#2", "source": "$ADDR", "role": "ci", "kind": "test",
+ "basis": "FAILED", "links": [["commit", "$SHA"]],
+ "data": {"suite": "$EL9#0", "name": "sanity.test_51b", "result": "fail",
+          "error": "dd failed: No space left on device", "duration": 41.5,
+          "url": null},
+ "notes": {}}
+EOF
+  check_json all 'map([.data.name, .data.result, .data.error])' << 'EOF'
+[["sanity.test_0a", "pass", null], ["sanity.test_1", "pass", null],
+ ["sanity.test_51b", "fail", "dd failed: No space left on device"],
+ ["sanity.test_60a", "skip", null],
+ ["test_101", "fail", "java.lang.AssertionError: timed out"]]
+EOF
+}
+
+test_tests_no_such_suite() {
+  route GET "${EL9}testReport/api/json?tree=suites[cases[$CASES]]{7,8}" \
+    report-none.json
+  call tests "$EL9#7"
+  check status "$STATUS" 1
+  check_has error "$ERR" "No such suite: $EL9#7"
+}
+
+test_tests_not_a_suite() {
+  call tests "$EL9"
+  check run "$STATUS" 1
+  call tests "${EL9}#x"
+  check index "$STATUS" 1
+  check requests "$(requests length)" 0
+}
+
+# A log is a download URL: the console, then each artifact
+test_logs() {
+  route GET "${EL9}api/json?tree=url,result,artifacts[relativePath]" \
+    artifacts.json
+  call logs "$EL9"
+  check status "$STATUS" 0
+  check_json console '.[0]' << EOF
+{"id": "${EL9}consoleText", "source": "$ADDR", "role": "ci", "kind": "log",
+ "basis": "FAILURE", "links": [],
+ "data": {"of": "$EL9", "name": "console.log",
+          "url": "${EL9}consoleText", "size": null},
+ "notes": {}}
+EOF
+  check_json artifacts '.[1:] | map([.data.name, .data.url])' << EOF
+[["artifacts/repodata/bac1c300-primary.xml.gz",
+  "${EL9}artifact/artifacts/repodata/bac1c300-primary.xml.gz"],
+ ["artifacts/RPMS/x86_64/lustre 2.16#1+rc.rpm",
+  "${EL9}artifact/artifacts/RPMS/x86_64/lustre%202.16%231%2Brc.rpm"]]
+EOF
+}
+
+test_logs_running() {
+  local run=https://ci.example.org/job/lustre-master/4568
+  ADDR=https://ci.example.org
+  route GET "$run/api/json?tree=url,result,artifacts[relativePath]" \
+    artifacts-running.json
+  call logs "$run"
+  check status "$STATUS" 0
+  check_json logs 'map([.basis, .data.name])' << 'EOF'
+[["running", "console.log"]]
+EOF
+}
+
+# Jenkins keeps logs per build only
+test_logs_suite() {
+  call logs "$EL9#0"
+  check status "$STATUS" 2
+  check requests "$(requests length)" 0
+}
+
 run() {
   local failed=$FAILED
   TEST=$1

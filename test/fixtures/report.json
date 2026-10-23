@@ -1,0 +1,9 @@
+{
+  "_class": "hudson.tasks.junit.TestResult",
+  "suites": [
+    {"cases": [{"status": "PASSED"}, {"status": "FIXED"}, {"status": "FAILED"}, {"status": "SKIPPED"}, {"status": "REGRESSION"}], "duration": 412.5, "name": "sanity"},
+    {"cases": [{"status": "PASSED"}, {"status": "PASSED"}], "duration": 30.0, "name": "conf-sanity"},
+    {"cases": [{"status": "SKIPPED"}], "duration": 0.0, "name": "sanity-hsm"},
+    {"cases": [], "duration": 0.0, "name": "empty"}
+  ]
+}

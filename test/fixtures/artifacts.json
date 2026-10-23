@@ -1,0 +1,9 @@
+{
+  "_class": "hudson.matrix.MatrixRun",
+  "artifacts": [
+    {"relativePath": "artifacts/repodata/bac1c300-primary.xml.gz"},
+    {"relativePath": "artifacts/RPMS/x86_64/lustre 2.16#1+rc.rpm"}
+  ],
+  "result": "FAILURE",
+  "url": "https://ci.example.org/job/lustre-reviews/arch=x86_64,build_type=server,distro=el9.7,ib_stack=inkernel/134377/"
+}

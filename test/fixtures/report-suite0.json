@@ -1,0 +1,12 @@
+{
+  "_class": "hudson.tasks.junit.TestResult",
+  "suites": [
+    {"cases": [
+      {"className": "sanity", "name": "test_0a", "status": "PASSED", "duration": 1.2, "errorDetails": null, "errorStackTrace": null},
+      {"className": "sanity", "name": "test_1", "status": "FIXED", "duration": 0.8, "errorDetails": null, "errorStackTrace": null},
+      {"className": "sanity", "name": "test_51b", "status": "FAILED", "duration": 41.5, "errorDetails": "dd failed: No space left on device\nat line 5000", "errorStackTrace": "trace"},
+      {"className": "sanity", "name": "test_60a", "status": "SKIPPED", "duration": 0.0, "errorDetails": null, "errorStackTrace": null},
+      {"className": "", "name": "test_101", "status": "REGRESSION", "duration": 3.0, "errorDetails": null, "errorStackTrace": "java.lang.AssertionError: timed out\n\tat x"}
+    ]}
+  ]
+}
